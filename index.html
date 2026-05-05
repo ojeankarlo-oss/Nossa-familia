@@ -57,12 +57,12 @@ const KEY="familia_v9";
 const TODAY=new Date().toISOString().split("T")[0];
 const getMonth=()=>new Date().toISOString().slice(0,7);
 const PTS={task:2,sleep:2,laundry:3};
-const MESADA_DEFAULT=300;
+const MESADA_DEFAULT=150;
 
 const EMPTY={
   members:[],tasks:[],menu:{},forum:[],tv:[],dishes:[],
   school:[],fitness:[],shopping:[],sleep:[],health:[],meds:[],
-  notifications:[],points:[],infractions:[],debts:[],admRequests:[],
+  notifications:[],points:[],infractions:[],debts:[],admRequests:[],taskProofs:[],infraDisputes:[],
   settings:{admPin:"0000",mesadaDefault:MESADA_DEFAULT}
 };
 
@@ -464,6 +464,9 @@ function InfracoesTab(){
   const[selInf,setSelInf]=useState("");
   const[obs,setObs]=useState("");
   const[filterLevel,setFilterLevel]=useState("all");
+  const[showDisputeModal,setShowDisputeModal]=useState(false);
+  const[disputeInfId,setDisputeInfId]=useState(null);
+  const[disputeReason,setDisputeReason]=useState("");
 
   const register=()=>{
     if(!selMember||!selInf){toast("Selecione membro e infracao!");return;}
@@ -497,11 +500,38 @@ function InfracoesTab(){
         return(
           React.createElement("div",{"key":inf.id,"style":{...card,padding:"12px 14px",background:lv.bg,border:`1px solid ${lv.color}33`}},React.createElement("div",{"style":{display:"flex",alignItems:"center",gap:10}},React.createElement("span",{"style":{fontSize:24,flexShrink:0}},lv.icon),React.createElement("div",{"style":{flex:1}},React.createElement("div",{"style":{fontWeight:700,fontSize:13}},inf.title),React.createElement("div",{"style":{fontSize:11,color:"#888",marginTop:2}},m?.name||"?","·",inf.date,"·",inf.pts,"pts"),inf.obs&&React.createElement("div",{"style":{fontSize:11,color:"#666",marginTop:2,fontStyle:"italic"}},"\"",inf.obs,"\"")),React.createElement("div",{"style":{textAlign:"right",flexShrink:0}},React.createElement("div",{"style":{fontWeight:800,fontSize:15,color:lv.color}},inf.pts),isAdm()?(
                   React.createElement(XBtn,{"onClick":()=>{if(window.confirm("Remover esta infracao?"))setData(d=>({...d,infractions:(d.infractions||[]).filter(x=>x.id!==inf.id)}));}})
+                ):(inf.who===getCurrentUser()?.id?(
+                  React.createElement("button",{"onClick":()=>{setDisputeInfId(inf.id);setShowDisputeModal(true);},"style":{background:"#FFF8E1",border:"1px solid #FFD54F",color:"#F57F17",fontSize:11,fontWeight:700,cursor:"pointer",padding:"5px 9px",borderRadius:8,marginLeft:4}},"✋ Contestar")
                 ):(
                   React.createElement("button",{"onClick":()=>requestAdmAuth("apagar_infracao",inf.id),"style":{background:"#EBF4FF",border:"1px solid #BBDEFB",color:"#1565C0",fontSize:11,fontWeight:700,cursor:"pointer",padding:"5px 9px",borderRadius:8,marginLeft:4}},"🔑 Pedir ADM")
-                ))))
+                )))))
         );
-      }),list.length===0&&React.createElement("div",{"style":{textAlign:"center",color:"#aaa",fontSize:14,padding:30}},"Nenhuma infracao",filterLevel!=="all"?`"${filterLevel}"`:"","este mes 🎉"))
+      }),list.length===0&&React.createElement("div",{"style":{textAlign:"center",color:"#aaa",fontSize:14,padding:30}},"Nenhuma infracao",filterLevel!=="all"?`"${filterLevel}"`:"","este mes 🎉"),
+
+    showDisputeModal&&disputeInfId&&(function(){
+      var inf=(data.infractions||[]).find(x=>x.id===disputeInfId);
+      var submitDispute=function(){
+        if(!disputeReason.trim()){toast("Escreva o motivo da contestacao!");return;}
+        setData(function(d){
+          var disputes=[...(d.infraDisputes||[])];
+          disputes.push({id:Date.now(),infId:disputeInfId,who:getCurrentUser()?.id,whoName:getCurrentUser()?.name,reason:disputeReason.trim(),date:TODAY,status:"pending",infTitle:inf?inf.title:""});
+          return Object.assign({},d,{infraDisputes:disputes});
+        });
+        addNotif("✋ "+getCurrentUser()?.name+" contestou: "+(inf?inf.title:"infracao"),"✋",getCurrentUser()?.id);
+        toast("Contestacao enviada ao ADM!");
+        setShowDisputeModal(false);setDisputeReason("");setDisputeInfId(null);
+      };
+      return React.createElement(Modal,{"onClose":function(){setShowDisputeModal(false);setDisputeReason("");}},
+        React.createElement("div",{"style":{fontWeight:700,fontSize:16,marginBottom:4}},"✋ Contestar Infracao"),
+        React.createElement("div",{"style":{fontSize:13,color:"#E74C3C",marginBottom:4,fontWeight:600}},inf?inf.title:""),
+        React.createElement("div",{"style":{fontSize:12,color:"#888",marginBottom:12}},"Explique por que voce acha que esta infracao nao e valida:"),
+        React.createElement("textarea",{"style":{width:"100%",padding:"12px 14px",borderRadius:12,border:"1.5px solid #E5E8F0",fontSize:14,outline:"none",resize:"none",height:100,fontFamily:"inherit"},"placeholder":"Descreva seu motivo aqui...","value":disputeReason,"onChange":function(e){setDisputeReason(e.target.value);}}),
+        React.createElement("button",{"onClick":submitDispute,"style":{background:"linear-gradient(135deg,#F57F17,#FF8F00)",color:"white",border:"none",borderRadius:12,padding:"13px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%",marginTop:10}},
+          "✋ Enviar Contestacao"
+        )
+      );
+    })()
+  )
   );
 }
 
@@ -513,6 +543,8 @@ function AutorizacoesTab(){
   const[codeErr,setCodeErr]=useState("");
   const pending=(data.admRequests||[]).filter(r=>r.status==="pending").sort((a,b)=>b.id-a.id);
   const recent=(data.admRequests||[]).filter(r=>r.status!=="pending").sort((a,b)=>b.id-a.id).slice(0,15);
+  const pendingProofs=(data.taskProofs||[]).filter(p=>p.status==="pending").sort((a,b)=>b.id-a.id);
+  const pendingDisputes=(data.infraDisputes||[]).filter(d=>d.status==="pending").sort((a,b)=>b.id-a.id);
 
   const getMName=(id)=>data.members.find(x=>x.id===id)?.name||"Alguem";
   const getInfTitle=(id)=>(data.infractions||[]).find(x=>x.id===id)?.title||"infracao";
@@ -549,7 +581,58 @@ function AutorizacoesTab(){
       ),pending.length===0&&(
         React.createElement("div",{"style":{...card,textAlign:"center",padding:32}},React.createElement("div",{"style":{fontSize:48}},"✅"),React.createElement("div",{"style":{fontWeight:700,color:"#666",marginTop:8}},"Nenhum pedido pendente"),React.createElement("div",{"style":{fontSize:12,color:"#aaa",marginTop:4}},"Quando alguem pedir autorizacao, aparece aqui"))
       ),recent.length>0&&(
-        React.createElement("div",{"style":{...card}},React.createElement("div",{"style":{fontWeight:700,fontSize:14,marginBottom:10}},"📋 Historico"),recent.map(r=>(
+        React.createElement("div",{"style":{...card}},React.createElement("div",{"style":{fontWeight:700,fontSize:14,marginBottom:10}},"📋 Historico"),
+          // Pending proofs
+          pendingProofs.length>0&&React.createElement("div",{"style":{...card,marginBottom:12}},
+            React.createElement("div",{"style":{fontWeight:700,fontSize:14,marginBottom:10}},"📸 Comprovantes Pendentes (",pendingProofs.length,")"),
+            pendingProofs.map(function(p){
+              var m=data.members.find(function(x){return x.id===p.who;});
+              return React.createElement("div",{"key":p.id,"style":{padding:"12px",background:"#F0F8FF",borderRadius:12,marginBottom:8,border:"1px solid #90CAF9"}},
+                React.createElement("div",{"style":{display:"flex",alignItems:"center",gap:8,marginBottom:8}},
+                  m&&React.createElement(Av,{"m":m,"size":34}),
+                  React.createElement("div",{"style":{flex:1}},
+                    React.createElement("div",{"style":{fontWeight:700,fontSize:13}},m?m.name:"?"),
+                    React.createElement("div",{"style":{fontSize:12,color:"#555"}},p.taskTitle)
+                  )
+                ),
+                React.createElement("img",{"src":p.img,"style":{width:"100%",borderRadius:10,maxHeight:160,objectFit:"cover",marginBottom:8}}),
+                React.createElement("div",{"style":{display:"flex",gap:8}},
+                  React.createElement("button",{"onClick":function(){
+                    setData(function(d){return Object.assign({},d,{taskProofs:(d.taskProofs||[]).map(function(x){return x.id===p.id?Object.assign({},x,{status:"approved"}):x;}),tasks:(d.tasks||[]).map(function(x){return x.id===p.taskId?Object.assign({},x,{done:true,pendingProof:false}):x;}),points:[...(d.points||[]),{id:Date.now(),who:p.who,pts:PTS.task,reason:"Tarefa comprovada: "+p.taskTitle,icon:"📸",date:TODAY,month:getMonth(),taskId:p.taskId}]});});
+                    addNotif("✅ Comprovante aprovado: "+p.taskTitle+" (+"+PTS.task+"pts)","✅",p.who);
+                    toast("Aprovado! +"+PTS.task+" pts");
+                  },"style":{flex:1,padding:"9px",background:"linear-gradient(135deg,#2E7D32,#4CAF50)",color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}},"✅ Aprovar"),
+                  React.createElement("button",{"onClick":function(){
+                    setData(function(d){return Object.assign({},d,{taskProofs:(d.taskProofs||[]).map(function(x){return x.id===p.id?Object.assign({},x,{status:"rejected"}):x;}),tasks:(d.tasks||[]).map(function(x){return x.id===p.taskId?Object.assign({},x,{done:false,pendingProof:false}):x;})});});
+                    toast("Comprovante rejeitado");
+                  },"style":{flex:1,padding:"9px",background:"#FFEBEE",color:"#C62828",border:"1px solid #FFCDD2",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}},"❌ Rejeitar")
+                )
+              );
+            })
+          ),
+          // Pending disputes
+          pendingDisputes.length>0&&React.createElement("div",{"style":{...card,marginBottom:12}},
+            React.createElement("div",{"style":{fontWeight:700,fontSize:14,marginBottom:10}},"✋ Contestacoes Pendentes (",pendingDisputes.length,")"),
+            pendingDisputes.map(function(dp){
+              return React.createElement("div",{"key":dp.id,"style":{padding:"12px",background:"#FFF8E1",borderRadius:12,marginBottom:8,border:"1px solid #FFD54F"}},
+                React.createElement("div",{"style":{fontWeight:700,fontSize:13}},dp.whoName," contesta:"),
+                React.createElement("div",{"style":{fontSize:12,color:"#E74C3C",marginTop:2,fontWeight:600}},dp.infTitle),
+                React.createElement("div",{"style":{fontSize:12,color:"#555",marginTop:6,padding:"8px",background:"white",borderRadius:8,fontStyle:"italic"}},'"',dp.reason,'"'),
+                React.createElement("div",{"style":{display:"flex",gap:8,marginTop:8}},
+                  React.createElement("button",{"onClick":function(){
+                    setData(function(d){return Object.assign({},d,{infraDisputes:(d.infraDisputes||[]).map(function(x){return x.id===dp.id?Object.assign({},x,{status:"approved"}):x;}),infractions:(d.infractions||[]).filter(function(x){return x.id!==dp.infId;})});});
+                    addNotif("✅ Contestacao aceita: "+dp.infTitle,"✅",dp.who);
+                    toast("Contestacao aceita! Infracao removida.");
+                  },"style":{flex:1,padding:"9px",background:"linear-gradient(135deg,#2E7D32,#4CAF50)",color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}},"✅ Aceitar"),
+                  React.createElement("button",{"onClick":function(){
+                    setData(function(d){return Object.assign({},d,{infraDisputes:(d.infraDisputes||[]).map(function(x){return x.id===dp.id?Object.assign({},x,{status:"denied"}):x;})});});
+                    toast("Contestacao negada.");
+                  },"style":{flex:1,padding:"9px",background:"#FFEBEE",color:"#C62828",border:"1px solid #FFCDD2",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}},"❌ Negar")
+                )
+              );
+            })
+          ),
+          recent.map(r=>(
             React.createElement("div",{"key":r.id,"style":{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid #f5f5f5"}},React.createElement("span",{"style":{fontSize:18}},r.status==="approved"?"✅":"❌"),React.createElement("div",{"style":{flex:1}},React.createElement("div",{"style":{fontSize:12,fontWeight:600}},r.whoName),React.createElement("div",{"style":{fontSize:11,color:"#888"}},r.date,"as",r.time)),React.createElement("span",{"style":{fontSize:11,fontWeight:700,color:r.status==="approved"?"#2E7D32":"#C62828"}},r.status==="approved"?"Aprovado":"Negado"))
           )))
       ))
@@ -558,67 +641,129 @@ function AutorizacoesTab(){
 
 // ─── TAREFAS TAB ──────────────────────────────────────────────────────────────
 function TarefasTab(){
-  const data=useStore();
-  const user=useAuth();
-  const month=getMonth();
-  const[showForm,setShowForm]=useState(false);
-  const[filterWho,setFilterWho]=useState("all");
+  var data=useStore();
+  var user=useAuth();
+  var month=getMonth();
+  var showFormS=useState(false);var showForm=showFormS[0];var setShowForm=showFormS[1];
+  var filterWhoS=useState("all");var filterWho=filterWhoS[0];var setFilterWho=filterWhoS[1];
+  var showProofS=useState(false);var showProofModal=showProofS[0];var setShowProofModal=showProofS[1];
+  var proofTaskS=useState(null);var proofTaskId=proofTaskS[0];var setProofTaskId=proofTaskS[1];
+  var proofImgS=useState(null);var proofImg=proofImgS[0];var setProofImg=proofImgS[1];
+  var R=React.createElement;
 
-  const toggle=(id)=>{
-    const t=(data.tasks||[]).find(x=>x.id===id);
+  var toggle=function(id){
+    var t=(data.tasks||[]).find(function(x){return x.id===id;});
     if(!t)return;
     if(!t.done){
       if(!canEdit(t.who)){toast("Somente o responsavel ou ADM!");return;}
-      const alreadyAwarded=(data.points||[]).some(p=>p.taskId===t.id);
+      if(!isAdm()){
+        setProofTaskId(id);setShowProofModal(true);return;
+      }
+      var alreadyAwarded=(data.points||[]).some(function(p){return p.taskId===t.id;});
       if(!alreadyAwarded){
-        const m=data.members.find(x=>x.id===t.who);
+        var m=data.members.find(function(x){return x.id===t.who;});
         if(m){
-          setData(d=>({...d,
-            tasks:d.tasks.map(x=>x.id===id?{...x,done:true}:x),
-            points:[...(d.points||[]),{id:Date.now(),who:m.id,pts:PTS.task,reason:`Tarefa: ${t.title}`,icon:"✅",date:TODAY,month,taskId:t.id}]
-          }));
-          addNotif(`✅ ${m.name} concluiu: ${t.title} (+${PTS.task}pts)`,"✅",m.id);
+          setData(function(d){return Object.assign({},d,{
+            tasks:d.tasks.map(function(x){return x.id===id?Object.assign({},x,{done:true}):x;}),
+            points:[...(d.points||[]),{id:Date.now(),who:m.id,pts:PTS.task,reason:"Tarefa: "+t.title,icon:"✅",date:TODAY,month:getMonth(),taskId:t.id}]
+          });});
+          addNotif("✅ "+m.name+" concluiu: "+t.title+" (+"+PTS.task+"pts)","✅",m.id);
           return;
         }
       }
     }
-    setData(d=>({...d,tasks:d.tasks.map(x=>x.id===id?{...x,done:!x.done}:x)}));
+    setData(function(d){return Object.assign({},d,{tasks:d.tasks.map(function(x){return x.id===id?Object.assign({},x,{done:!x.done}):x;})});});
   };
 
-  const save=(f)=>{
-    setData(d=>({...d,tasks:[...(d.tasks||[]),{id:Date.now(),...f,done:false,date:TODAY}]}));
+  var save=function(f){
+    setData(function(d){return Object.assign({},d,{tasks:[...(d.tasks||[]),Object.assign({id:Date.now()},f,{done:false,date:TODAY})]});});
     setShowForm(false);toast("Tarefa adicionada!");
   };
 
-  const del=(id)=>{
-    const t=(data.tasks||[]).find(x=>x.id===id);
+  var del=function(id){
+    var t=(data.tasks||[]).find(function(x){return x.id===id;});
     if(t&&!canEdit(t.who)){toast("Somente o responsavel ou ADM pode apagar!");return;}
     if(!window.confirm("Remover tarefa?"))return;
-    setData(d=>({...d,tasks:(d.tasks||[]).filter(x=>x.id!==id)}));
+    setData(function(d){return Object.assign({},d,{tasks:(d.tasks||[]).filter(function(x){return x.id!==id;})});});
   };
 
-  const tasks=(data.tasks||[]).filter(t=>filterWho==="all"||t.who===parseInt(filterWho));
-  const done=tasks.filter(t=>t.done).length;
+  var submitProof=function(){
+    if(!proofImg){toast("Adicione uma foto!");return;}
+    var t=(data.tasks||[]).find(function(x){return x.id===proofTaskId;});
+    if(!t)return;
+    var m=data.members.find(function(x){return x.id===t.who;});
+    if(!m)return;
+    setData(function(d){
+      return Object.assign({},d,{
+        taskProofs:[...(d.taskProofs||[]),{id:Date.now(),taskId:proofTaskId,who:m.id,img:proofImg,date:TODAY,status:"pending",taskTitle:t.title}],
+        tasks:(d.tasks||[]).map(function(x){return x.id===proofTaskId?Object.assign({},x,{done:true,pendingProof:true}):x;})
+      });
+    });
+    addNotif("📸 "+m.name+" enviou comprovante: "+t.title,"📸",m.id);
+    toast("Comprovante enviado! Aguardando ADM.");
+    setShowProofModal(false);setProofImg(null);setProofTaskId(null);
+  };
 
-  return(
-    React.createElement("div",{"style":{display:"flex",flexDirection:"column",gap:14}},React.createElement("div",{"style":{background:"linear-gradient(135deg,#7ED321,#4CAF50)",borderRadius:20,padding:20,color:"white"}},React.createElement("div",{"style":{fontSize:13,opacity:.8}},"✅ Tarefas"),React.createElement("div",{"style":{fontSize:22,fontWeight:800,marginTop:2}},done,"/",tasks.length,"concluidas"),React.createElement("div",{"style":{background:"rgba(255,255,255,.3)",borderRadius:20,height:6,marginTop:10}},React.createElement("div",{"style":{background:"white",borderRadius:20,height:6,width:`${tasks.length?done/tasks.length*100:0}%`}}))),React.createElement("div",{"style":{display:"flex",gap:8,overflowX:"auto"}},React.createElement("button",{"onClick":()=>setFilterWho("all"),"style":{whiteSpace:"nowrap",padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",background:filterWho==="all"?"#7ED321":"#F0F0F0",color:filterWho==="all"?"white":"#555",fontWeight:700,fontSize:13}},"Todos"),data.members.map(m=>(
-          React.createElement("button",{"key":m.id,"onClick":()=>setFilterWho(String(m.id)),"style":{whiteSpace:"nowrap",padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",background:filterWho===String(m.id)?m.color:"#F0F0F0",color:filterWho===String(m.id)?"white":"#555",fontWeight:700,fontSize:13}},m.name)
-        ))),Object.entries(TCATS).map(([ck,cat])=>{
-        const items=tasks.filter(t=>t.cat===ck);
-        if(!items.length)return null;
-        return(
-          React.createElement("div",{"key":ck,"style":{...card}},React.createElement("div",{"style":{fontWeight:700,marginBottom:8,fontSize:13}},cat.i,cat.l),items.map(t=>{
-              const m=data.members.find(x=>x.id===t.who);
-              return(
-                React.createElement("div",{"key":t.id,"style":{display:"flex",alignItems:"center",gap:8,padding:"10px",background:t.done?"#F0FFF4":"#FAFAFA",borderRadius:10,marginBottom:4,border:`1px solid ${t.done?"#7ED32133":"#eee"}`}},React.createElement("div",{"onClick":()=>toggle(t.id),"style":{width:22,height:22,borderRadius:"50%",border:`2px solid ${t.done?"#7ED321":"#ccc"}`,background:t.done?"#7ED321":"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"white",flexShrink:0,cursor:"pointer"}},t.done?"✓":""),React.createElement("span",{"onClick":()=>toggle(t.id),"style":{flex:1,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?"#888":"#333",cursor:"pointer"}},t.title),t.done&&React.createElement("span",{"style":{fontSize:10,color:"#7ED321",fontWeight:700}},"+",PTS.task),m&&React.createElement(Av,{"m":m,"size":26}),canEdit(t.who)&&React.createElement(XBtn,{"onClick":()=>del(t.id),"label":"×"}))
-              );
-            }))
-        );
-      }),tasks.length===0&&React.createElement("div",{"style":{textAlign:"center",color:"#aaa",fontSize:14,padding:30}},"Nenhuma tarefa. Adicione uma!"),React.createElement("button",{"onClick":()=>setShowForm(true),"style":{...pbtn("linear-gradient(135deg,#7ED321,#4CAF50)"),padding:"14px"}},"+ Nova Tarefa"),showForm&&React.createElement(Modal,{"onClose":()=>setShowForm(false)},React.createElement(FormTarefa,{"members":data.members,"onSave":save,"onCancel":()=>setShowForm(false)})))
+  var tasks=(data.tasks||[]).filter(function(t){return filterWho==="all"||t.who===parseInt(filterWho);});
+  var done=tasks.filter(function(t){return t.done;}).length;
+
+  return R("div",{style:{display:"flex",flexDirection:"column",gap:14}},
+    R("div",{style:{background:"linear-gradient(135deg,#7ED321,#4CAF50)",borderRadius:20,padding:20,color:"white"}},
+      R("div",{style:{fontSize:13,opacity:.8}},"✅ Tarefas"),
+      R("div",{style:{fontSize:22,fontWeight:800,marginTop:2}},done+"/"+tasks.length+" concluidas"),
+      R("div",{style:{background:"rgba(255,255,255,.3)",borderRadius:20,height:6,marginTop:10}},
+        R("div",{style:{background:"white",borderRadius:20,height:6,width:(tasks.length?done/tasks.length*100:0)+"%"}})
+      )
+    ),
+    R("div",{style:{display:"flex",gap:8,overflowX:"auto"}},
+      R("button",{onClick:function(){setFilterWho("all");},style:{whiteSpace:"nowrap",padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",background:filterWho==="all"?"#7ED321":"#F0F0F0",color:filterWho==="all"?"white":"#555",fontWeight:700,fontSize:13}},"Todos"),
+      data.members.map(function(m){
+        return R("button",{key:m.id,onClick:function(){setFilterWho(String(m.id));},style:{whiteSpace:"nowrap",padding:"8px 14px",borderRadius:20,border:"none",cursor:"pointer",background:filterWho===String(m.id)?m.color:"#F0F0F0",color:filterWho===String(m.id)?"white":"#555",fontWeight:700,fontSize:13}},m.name);
+      })
+    ),
+    Object.entries(TCATS).map(function(entry){
+      var ck=entry[0],cat=entry[1];
+      var items=tasks.filter(function(t){return t.cat===ck;});
+      if(!items.length)return null;
+      return R("div",{key:ck,style:{...card}},
+        R("div",{style:{fontWeight:700,marginBottom:8,fontSize:13}},cat.i+" "+cat.l),
+        items.map(function(t){
+          var m=data.members.find(function(x){return x.id===t.who;});
+          var proof=(data.taskProofs||[]).find(function(p){return p.taskId===t.id&&p.status==="pending";});
+          return R("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"10px",background:t.done?"#F0FFF4":"#FAFAFA",borderRadius:10,marginBottom:4,border:"1px solid "+(t.done?"#7ED32133":"#eee")}},
+            R("div",{onClick:function(){toggle(t.id);},style:{width:22,height:22,borderRadius:"50%",border:"2px solid "+(t.done?"#7ED321":"#ccc"),background:t.done?"#7ED321":"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"white",flexShrink:0,cursor:"pointer"}},t.done?"✓":""),
+            R("span",{onClick:function(){toggle(t.id);},style:{flex:1,fontSize:13,textDecoration:t.done?"line-through":"none",color:t.done?"#888":"#333",cursor:"pointer"}},t.title),
+            proof&&R("span",{style:{fontSize:10,color:"#F5A623",fontWeight:700}},"⏳ADM"),
+            t.done&&!proof&&R("span",{style:{fontSize:10,color:"#7ED321",fontWeight:700}},"+"+PTS.task),
+            m&&R(Av,{m:m,size:26}),
+            canEdit(t.who)&&R(XBtn,{onClick:function(){del(t.id);},label:"×"})
+          );
+        })
+      );
+    }),
+    tasks.length===0&&R("div",{style:{textAlign:"center",color:"#aaa",fontSize:14,padding:30}},"Nenhuma tarefa. Adicione uma!"),
+    R("button",{onClick:function(){setShowForm(true);},style:{...pbtn("linear-gradient(135deg,#7ED321,#4CAF50)"),padding:"14px"}},"+ Nova Tarefa"),
+    showForm&&R(Modal,{onClose:function(){setShowForm(false);}},R(FormTarefa,{members:data.members,onSave:save,onCancel:function(){setShowForm(false);}})),
+    showProofModal&&proofTaskId&&R(Modal,{onClose:function(){setShowProofModal(false);setProofImg(null);}},
+      R("div",{style:{fontWeight:700,fontSize:16,marginBottom:4}},"📸 Comprovar Tarefa"),
+      R("div",{style:{fontSize:13,color:"#888",marginBottom:16}},((data.tasks||[]).find(function(x){return x.id===proofTaskId;})||{}).title||""),
+      R("div",{style:{display:"flex",gap:8,marginBottom:12}},
+        R("label",{style:{flex:1,background:"linear-gradient(135deg,#4A90D9,#7B5EA7)",color:"white",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center",display:"block"}},
+          "📷 Tirar Foto",
+          R("input",{type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProofImg(ev.target.result);};reader.readAsDataURL(file);}})
+        ),
+        R("label",{style:{flex:1,background:"#F0F2F8",color:"#333",borderRadius:12,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center",display:"block"}},
+          "🖼️ Da Galeria",
+          R("input",{type:"file",accept:"image/*",style:{display:"none"},onChange:function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){setProofImg(ev.target.result);};reader.readAsDataURL(file);}})
+        )
+      ),
+      proofImg&&R("div",{style:{marginBottom:12,borderRadius:12,overflow:"hidden",border:"2px solid #7ED321"}},R("img",{src:proofImg,style:{width:"100%",maxHeight:200,objectFit:"cover"}})),
+      !proofImg&&R("div",{style:{padding:"20px",background:"#F8F9FF",borderRadius:12,textAlign:"center",color:"#aaa",marginBottom:12,fontSize:13}},"Nenhuma foto selecionada"),
+      R("button",{onClick:submitProof,style:{...pbtn("linear-gradient(135deg,#7ED321,#4CAF50)"),padding:"13px",opacity:proofImg?1:.5}},"✅ Enviar Comprovante")
+    )
   );
 }
 
-// ─── SONO TAB ─────────────────────────────────────────────────────────────────
 function SonoTab(){
   const data=useStore();
   const user=useAuth();
@@ -997,7 +1142,7 @@ function App(){
 
   const month=getMonth();
   const unread=(data.notifications||[]).filter(n=>!n.read).length;
-  const pendingAuth=(data.admRequests||[]).filter(r=>r.status==="pending").length;
+  const pendingAuth=(data.admRequests||[]).filter(r=>r.status==="pending").length+((data.taskProofs||[]).filter(p=>p.status==="pending").length)+((data.infraDisputes||[]).filter(d=>d.status==="pending").length);
   const infCount=(data.infractions||[]).filter(x=>x.month===month).length;
 
   const TABS=[
