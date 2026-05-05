@@ -349,9 +349,38 @@ function HomeTab({setTab}){
           return(
             React.createElement("div",{"key":m.id,"style":{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<2?"1px solid #f5f5f5":"none"}},React.createElement("div",{"style":{fontSize:20,width:28,textAlign:"center"}},["🥇","🥈","🥉"][i]),React.createElement(Av,{"m":m,"size":34}),React.createElement("div",{"style":{flex:1,fontWeight:600,fontSize:13}},m.name),React.createElement("div",{"style":{fontWeight:800,fontSize:15,color:pts>=0?"#4A90D9":"#E74C3C"}},pts>0?"+":"",pts,"pts"))
           );
-        }),data.members.length===0&&React.createElement("div",{"style":{textAlign:"center",color:"#aaa",fontSize:13}},"Nenhum membro ainda")))
+        }),data.members.length===0&&React.createElement("div",{"style":{textAlign:"center",color:"#aaa",fontSize:13}},"Nenhum membro ainda")),
+
+    (function(){
+      var wr=getWeekRange();var wS=wr.start;var wE=wr.end;
+      var cu=getCurrentUser();
+      if(!cu||cu.isAdm)return null;
+      var wPts=(data.points||[]).filter(function(p){return p.who===cu.id&&p.date>=wS&&p.date<=wE;}).reduce(function(a,p){return a+p.pts;},0);
+      var level=getMsgLevel(wPts);
+      var colors=MSG_COLORS[level];
+      var msg=getWeeklyMsg(wPts);
+      return React.createElement("div",{"style":{background:colors.bg,borderRadius:18,padding:18,marginTop:4}},
+        React.createElement("div",{"style":{color:colors.text,fontWeight:800,fontSize:15,marginBottom:6}},"📊 Seu resumo desta semana"),
+        React.createElement("div",{"style":{color:colors.text,fontSize:13,lineHeight:1.6,marginBottom:10}},msg),
+        React.createElement("div",{"style":{display:"flex",alignItems:"center",gap:10}},
+          React.createElement("div",{"style":{background:"rgba(255,255,255,.25)",borderRadius:10,padding:"6px 14px",color:colors.text,fontWeight:800,fontSize:18}},wPts>=0?"+"+wPts:wPts,"pts"),
+          React.createElement("div",{"style":{fontSize:12,color:colors.text,opacity:.85}},"esta semana")
+        )
+      );
+    })(),
+
+    ("Notification" in window)&&Notification.permission!=="granted"&&React.createElement("div",{"style":{background:"white",borderRadius:16,padding:14,boxShadow:"0 2px 8px rgba(0,0,0,.06)",display:"flex",alignItems:"center",gap:12}},
+      React.createElement("div",{"style":{fontSize:30}},"🔔"),
+      React.createElement("div",{"style":{flex:1}},
+        React.createElement("div",{"style":{fontWeight:700,fontSize:13}},"Ativar Notificacoes"),
+        React.createElement("div",{"style":{fontSize:11,color:"#888"}},"Lembrete de sono as 23h + resumo semanal")
+      ),
+      React.createElement("button",{"onClick":requestNotifPermission,"style":{background:"linear-gradient(135deg,#4A90D9,#7B5EA7)",color:"white",border:"none",borderRadius:10,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}},"Ativar")
+    )
+  )
   );
 }
+
 
 // ─── RANKING TAB ──────────────────────────────────────────────────────────────
 function RankingTab(){
@@ -968,6 +997,260 @@ function NotifsTab(){
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
+// ─── MENSAGENS MOTIVACIONAIS ──────────────────────────────────────────────────
+var MOTIVATIONAL_MSGS = {
+  excellent: [
+    "🏆 Incrivel! Voce arrasou essa semana! Continue assim!",
+    "⭐ Que semana poderosa! Voce e um exemplo para a familia!",
+    "🌟 Parabens! Voce mostrou que disciplina traz resultados!",
+    "🎯 Perfeito! Sua dedicacao esta fazendo a diferenca!"
+  ],
+  good: [
+    "👏 Otima semana! Voce esta no caminho certo!",
+    "💪 Muito bem! Cada ponto e um passo para seu objetivo!",
+    "😊 Boa semana! Continue se esforçando e vai chegar la!",
+    "✨ Voce esta evoluindo! Semana que vem vai ser ainda melhor!"
+  ],
+  medium: [
+    "🌱 Semana razoavel. Voce pode mais! Acredite em voce!",
+    "💭 Metade do caminho! Foque nas tarefas e veja sua pontuacao subir!",
+    "🔥 Ainda da tempo de virar o jogo! Vai fundo!",
+    "📈 Cada dia e uma nova chance. Amanha comece diferente!"
+  ],
+  low: [
+    "🤗 Semana dificil? Tudo bem! O importante e nao desistir!",
+    "💙 Todos temos semanas dificeis. Semana que vem sera melhor!",
+    "🌅 Cada amanhecer e uma nova oportunidade. Vai la!",
+    "🙏 Nao desanime! Voce e capaz de muito mais!"
+  ]
+};
+
+var SLEEP_REMINDERS = [
+  "😴 Hora de dormir! Uma boa noite de sono e fundamental para seu dia!",
+  "🌙 23h! Descanse bem para amanha ser incrivel!",
+  "💤 Ja e hora! Durma bem e acorde renovado amanha!",
+  "🛏️ Hora de recarregar as energias! Boa noite!"
+];
+
+function getWeeklyMsg(pts){
+  var msg;
+  if(pts>=20) msg=MOTIVATIONAL_MSGS.excellent;
+  else if(pts>=12) msg=MOTIVATIONAL_MSGS.good;
+  else if(pts>=6) msg=MOTIVATIONAL_MSGS.medium;
+  else msg=MOTIVATIONAL_MSGS.low;
+  return msg[Math.floor(Math.random()*msg.length)];
+}
+
+function getMsgLevel(pts){
+  if(pts>=20)return"excellent";
+  if(pts>=12)return"good";
+  if(pts>=6)return"medium";
+  return"low";
+}
+
+var MSG_COLORS={
+  excellent:{bg:"linear-gradient(135deg,#F5A623,#F7C63B)",text:"#7B4F00"},
+  good:{bg:"linear-gradient(135deg,#7ED321,#4CAF50)",text:"white"},
+  medium:{bg:"linear-gradient(135deg,#4A90D9,#5BA4E5)",text:"white"},
+  low:{bg:"linear-gradient(135deg,#7B5EA7,#9B7EC7)",text:"white"}
+};
+
+// ─── NOTIFICATIONS SETUP ──────────────────────────────────────────────────────
+function requestNotifPermission(){
+  if(!("Notification" in window)){toast("Seu navegador nao suporta notificacoes");return;}
+  Notification.requestPermission().then(function(perm){
+    if(perm==="granted"){
+      toast("✅ Notificacoes ativadas!");
+      scheduleSleepReminder();
+    } else {
+      toast("Notificacoes bloqueadas. Ative nas configuracoes do Chrome.");
+    }
+  });
+}
+
+function scheduleSleepReminder(){
+  // Schedule daily 23h notification using setTimeout
+  var now=new Date();
+  var target=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,0,0);
+  if(target<=now) target.setDate(target.getDate()+1);
+  var diff=target-now;
+  setTimeout(function(){
+    if(Notification.permission==="granted"){
+      var msg=SLEEP_REMINDERS[Math.floor(Math.random()*SLEEP_REMINDERS.length)];
+      new Notification("🌙 Nossa Familia",{body:msg,icon:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>"});
+    }
+    scheduleSleepReminder(); // reschedule for next day
+  },diff);
+}
+
+function sendWeeklyNotif(memberName, pts){
+  if(Notification.permission==="granted"){
+    var msg=getWeeklyMsg(pts);
+    new Notification("📊 "+memberName+" — Resumo Semanal",{body:msg+" ("+pts+" pontos esta semana)",icon:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>"});
+  }
+}
+
+// ─── AGENDA TAB ───────────────────────────────────────────────────────────────
+function AgendaTab(){
+  var data=useStore();
+  var user=useAuth();
+  var R=React.createElement;
+  var nowD=new Date();
+  var monthOffS=useState(0);var monthOff=monthOffS[0];var setMonthOff=monthOffS[1];
+  var selDayS=useState(null);var selDay=selDayS[0];var setSelDay=selDayS[1];
+
+  var viewDate=new Date(nowD.getFullYear(),nowD.getMonth()+monthOff,1);
+  var year=viewDate.getFullYear();
+  var month=viewDate.getMonth();
+  var monthStr=(year+"-"+(month+1<10?"0":"")+(month+1));
+  var monthNames=["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  var dayNames=["D","S","T","Q","Q","S","S"];
+
+  // Build calendar days
+  var firstDay=new Date(year,month,1).getDay();
+  var daysInMonth=new Date(year,month+1,0).getDate();
+  var todayStr=TODAY;
+
+  // Get events per day
+  function getDayEvents(dayStr){
+    var tasks=(data.tasks||[]).filter(function(t){return t.date===dayStr;});
+    var doneTasks=tasks.filter(function(t){return t.done;});
+    var infs=(data.infractions||[]).filter(function(i){return i.date===dayStr;});
+    var sleep=(data.sleep||[]).filter(function(s){return s.date===dayStr;});
+    var proofs=(data.taskProofs||[]).filter(function(p){return p.date===dayStr;});
+    return{tasks,doneTasks,infs,sleep,proofs};
+  }
+
+  function fmtDay(d){
+    return year+"-"+(month+1<10?"0":"")+(month+1)+"-"+(d<10?"0":"")+d;
+  }
+
+  // Selected day events
+  var selEvents=selDay?getDayEvents(selDay):{tasks:[],doneTasks:[],infs:[],sleep:[],proofs:[]};
+  var selDateObj=selDay?new Date(selDay+"T12:00:00"):null;
+
+  return R("div",{style:{display:"flex",flexDirection:"column",gap:14}},
+
+    // Header
+    R("div",{style:{background:"linear-gradient(135deg,#1565C0,#42A5F5)",borderRadius:20,padding:20,color:"white"}},
+      R("div",{style:{fontSize:13,opacity:.8}},"📅 Agenda"),
+      R("div",{style:{fontSize:22,fontWeight:800,marginTop:2}},"Calendario da Familia"),
+      R("div",{style:{fontSize:12,opacity:.8,marginTop:4}},"Tarefas, Infracoes e Sono por dia")
+    ),
+
+    // Month navigation
+    R("div",{style:{display:"flex",alignItems:"center",gap:8}},
+      R("button",{onClick:function(){setMonthOff(monthOff-1);setSelDay(null);},style:{background:"white",border:"1px solid #eee",borderRadius:10,padding:"10px 16px",fontSize:16,cursor:"pointer",fontWeight:700}},"←"),
+      R("div",{style:{flex:1,textAlign:"center",fontWeight:800,fontSize:16}},monthNames[month]+" "+year),
+      R("button",{onClick:function(){setMonthOff(monthOff+1);setSelDay(null);},style:{background:"white",border:"1px solid #eee",borderRadius:10,padding:"10px 16px",fontSize:16,cursor:"pointer",fontWeight:700}},"→")
+    ),
+
+    // Calendar grid
+    R("div",{style:{background:"white",borderRadius:16,padding:14,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}},
+      // Day headers
+      R("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:8}},
+        dayNames.map(function(d,i){return R("div",{key:i,style:{textAlign:"center",fontSize:11,fontWeight:700,color:i===0?"#E74C3C":i===6?"#4A90D9":"#888",padding:"4px 0"}},d);})
+      ),
+      // Day cells
+      R("div",{style:{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}},
+        // Empty cells for first day offset
+        Array.from({length:firstDay},function(_,i){return R("div",{key:"e"+i});}),
+        // Day cells
+        Array.from({length:daysInMonth},function(_,i){
+          var d=i+1;
+          var dayStr=fmtDay(d);
+          var ev=getDayEvents(dayStr);
+          var isToday=dayStr===todayStr;
+          var isSel=dayStr===selDay;
+          var hasTasks=ev.tasks.length>0;
+          var hasInf=ev.infs.length>0;
+          var hasSleep=ev.sleep.length>0;
+          var hasAny=hasTasks||hasInf||hasSleep;
+          return R("div",{key:d,onClick:function(){setSelDay(isSel?null:dayStr);},
+            style:{
+              position:"relative",textAlign:"center",padding:"6px 2px",borderRadius:8,cursor:"pointer",
+              background:isSel?"#1565C0":isToday?"#E3F2FD":"transparent",
+              border:isToday&&!isSel?"1.5px solid #42A5F5":"1.5px solid transparent"
+            }},
+            R("div",{style:{fontSize:13,fontWeight:isToday||isSel?800:400,color:isSel?"white":isToday?"#1565C0":"#333"}},d),
+            hasAny&&R("div",{style:{display:"flex",justifyContent:"center",gap:2,marginTop:2}},
+              hasTasks&&R("div",{style:{width:5,height:5,borderRadius:"50%",background:isSel?"white":ev.doneTasks.length===ev.tasks.length?"#7ED321":"#F5A623"}}),
+              hasInf&&R("div",{style:{width:5,height:5,borderRadius:"50%",background:isSel?"white":"#E74C3C"}}),
+              hasSleep&&R("div",{style:{width:5,height:5,borderRadius:"50%",background:isSel?"white":"#3F51B5"}})
+            )
+          );
+        })
+      ),
+      // Legend
+      R("div",{style:{display:"flex",gap:12,marginTop:10,justifyContent:"center",flexWrap:"wrap"}},
+        R("div",{style:{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#888"}},R("div",{style:{width:8,height:8,borderRadius:"50%",background:"#7ED321"}}),"Tarefas OK"),
+        R("div",{style:{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#888"}},R("div",{style:{width:8,height:8,borderRadius:"50%",background:"#F5A623"}}),"Pendentes"),
+        R("div",{style:{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#888"}},R("div",{style:{width:8,height:8,borderRadius:"50%",background:"#E74C3C"}}),"Infracoes"),
+        R("div",{style:{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#888"}},R("div",{style:{width:8,height:8,borderRadius:"50%",background:"#3F51B5"}}),"Sono")
+      )
+    ),
+
+    // Selected day detail
+    selDay&&R("div",{style:{background:"white",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,.07)"}},
+      R("div",{style:{fontWeight:800,fontSize:16,marginBottom:12,color:"#1565C0"}},
+        "📅 "+selDateObj.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"})
+      ),
+
+      // Tasks
+      selEvents.tasks.length>0&&R("div",{style:{marginBottom:12}},
+        R("div",{style:{fontWeight:700,fontSize:13,marginBottom:6}},"✅ Tarefas"),
+        selEvents.tasks.map(function(t){
+          var m=data.members.find(function(x){return x.id===t.who;});
+          return R("div",{key:t.id,style:{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:t.done?"#F0FFF4":"#FFF8E1",borderRadius:9,marginBottom:3}},
+            R("span",{style:{fontSize:16}},t.done?"✅":"⏳"),
+            R("div",{style:{flex:1}},
+              R("div",{style:{fontSize:12,fontWeight:600}},t.title),
+              m&&R("div",{style:{fontSize:11,color:"#888"}},m.name)
+            ),
+            t.done&&R("span",{style:{fontSize:11,color:"#2E7D32",fontWeight:700}},"+"+PTS.task+"pts")
+          );
+        })
+      ),
+
+      // Infractions
+      selEvents.infs.length>0&&R("div",{style:{marginBottom:12}},
+        R("div",{style:{fontWeight:700,fontSize:13,marginBottom:6}},"⚠️ Infracoes"),
+        selEvents.infs.map(function(inf){
+          var m=data.members.find(function(x){return x.id===inf.who;});
+          var lv=LEVEL[inf.level]||LEVEL.leve;
+          return R("div",{key:inf.id,style:{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:lv.bg,borderRadius:9,marginBottom:3}},
+            R("span",{style:{fontSize:16}},lv.icon),
+            R("div",{style:{flex:1}},
+              R("div",{style:{fontSize:12,fontWeight:600}},inf.title),
+              m&&R("div",{style:{fontSize:11,color:"#888"}},m.name)
+            ),
+            R("span",{style:{fontSize:11,color:lv.color,fontWeight:700}},inf.pts+"pts")
+          );
+        })
+      ),
+
+      // Sleep
+      selEvents.sleep.length>0&&R("div",{style:{marginBottom:12}},
+        R("div",{style:{fontWeight:700,fontSize:13,marginBottom:6}},"😴 Sono"),
+        selEvents.sleep.map(function(s){
+          var m=data.members.find(function(x){return x.id===s.who;});
+          var hrs=s.bed&&s.wake?(function(){var bh=parseInt(s.bed),wh=parseInt(s.wake);var mins=(wh*60)-(bh*60);if(mins<0)mins+=1440;return Math.round(mins/60*10)/10;})():0;
+          return R("div",{key:s.id,style:{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#EDE7F6",borderRadius:9,marginBottom:3}},
+            R("span",{style:{fontSize:16}},"😴"),
+            R("div",{style:{flex:1}},
+              m&&R("div",{style:{fontSize:12,fontWeight:600}},m.name),
+              R("div",{style:{fontSize:11,color:"#888"}},s.bed+" → "+s.wake+" ("+hrs+"h)")
+            )
+          );
+        })
+      ),
+
+      selEvents.tasks.length===0&&selEvents.infs.length===0&&selEvents.sleep.length===0&&
+        R("div",{style:{textAlign:"center",color:"#aaa",fontSize:13,padding:"16px 0"}},"Nenhum registro neste dia")
+    )
+  );
+}
+
 function CardapioTab(){
   var data=useStore();
   var user=useAuth();
@@ -1129,6 +1412,27 @@ function App(){
 
   // Firebase sync
   useEffect(()=>{
+    // Start sleep reminder if permission granted
+    if(("Notification" in window)&&Notification.permission==="granted"){
+      scheduleSleepReminder();
+    }
+    // Weekly summary notification - every Sunday
+    var checkWeeklySummary=function(){
+      var now=new Date();
+      if(now.getDay()===0){ // Sunday
+        var data=getData();
+        var wr=getWeekRange();
+        (data.members||[]).forEach(function(m){
+          var wPts=(data.points||[]).filter(function(p){return p.who===m.id&&p.date>=wr.start&&p.date<=wr.end;}).reduce(function(a,p){return a+p.pts;},0);
+          sendWeeklyNotif(m.name,wPts);
+        });
+      }
+    };
+    // Check once on load if it's Sunday
+    setTimeout(checkWeeklySummary,3000);
+  },[]);
+
+  useEffect(()=>{
     if(window._fbOn)window._fbOn(remote=>{
       if(JSON.stringify(remote)!==JSON.stringify(_data)){
         _data=remote;
@@ -1156,7 +1460,7 @@ function App(){
     {id:"fitness",l:"Fitness",i:"🏋️"},
     {id:"compras",l:"Compras",i:"🛒"},
     {id:"forum",l:"Forum",i:"💬"},
-    {id:"cardapio",l:"Cardapio",i:"🍽️"},
+    {id:"agenda",l:"Agenda",i:"📅"},{id:"cardapio",l:"Cardapio",i:"🍽️"},
     {id:"notifs",l:"Notifs",i:"🔔"},
     {id:"perfis",l:"Perfis",i:"👤"},
   ];
@@ -1181,6 +1485,7 @@ function App(){
       case"fitness": return React.createElement(FitnessTab,null);
       case"compras": return React.createElement(ComprasTab,null);
       case"forum": return React.createElement(ForumTab,null);
+      case"agenda": return React.createElement(AgendaTab,null);
       case"cardapio": return React.createElement(CardapioTab,null);
       case"notifs": return React.createElement(NotifsTab,null);
       case"perfis": return React.createElement(PerfisTab,null);
